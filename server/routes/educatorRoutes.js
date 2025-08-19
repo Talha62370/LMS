@@ -4,10 +4,7 @@ import { requireAuth } from '@clerk/express';
 
 const educatorRouter = express.Router();
 
-educatorRouter.get('/update-role', requireAuth(), (req, res) => {
-    console.log("✅ /update-role route hit");
-    res.json({ test: true });
-});
+educatorRouter.get('/update-role',requireAuth, updateRoleToEducator);
 
 
 export default educatorRouter;

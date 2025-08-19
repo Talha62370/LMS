@@ -13,13 +13,13 @@ connectDB().catch(err => console.error('DB connection error:', err));
 
 // Middleware
 app.use(cors());
-app.use(clerkMiddleware()); // ✅ This parses the Clerk token and populates req.auth
+app.use(clerkMiddleware());
 app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => res.send("API working"));
 app.post('/clerk', clerkWebhooks);
-app.use('/api/educator', educatorRouter); // ✅ Now has requireAuth
+app.use('/api/educator', educatorRouter); 
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
