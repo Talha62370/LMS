@@ -10,19 +10,19 @@ export const clerkWebhooks = async (req, res) => {
             "svix-signature": req.headers["svix-signature"]
         };
 
+        // Verify the webhook signature - THIS IS CRITICAL
         const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
         const evt = wh.verify(payload, headers);
-
-        const { data, type } = evt;
+        const { data, type } = evt; // Use the verified event data
 
         switch (type) {
             case 'user.created': {
                 const userData = {
-                    _id: data.id, // Clerk uses 'id' not '_id'
+                    _id: data.id,
                     email: data.email_addresses[0].email_address,
                     name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-                    imageUrl: data.image_url, // lowercase 'url'
-                    enrolledCourses: []
+                    imageUrl: data.image_url,
+                    enrolledCourses: [] // Added missing field
                 };
                 await User.create(userData);
                 return res.status(200).json({ success: true });
@@ -30,11 +30,11 @@ export const clerkWebhooks = async (req, res) => {
 
             case 'user.updated': {
                 const userData = {
-                    email: data.email_addresses[0].email_address, // plural 'addresses'
+                    email: data.email_addresses[0].email_address,
                     name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-                    imageUrl: data.image_url // lowercase 'url'
+                    imageUrl: data.image_url
                 };
-                await User.findByIdAndUpdate(data.id, userData);
+                await User.findByIdAndUpdate(data.id, userData, { new: true });
                 return res.status(200).json({ success: true });
             }
 
@@ -46,11 +46,11 @@ export const clerkWebhooks = async (req, res) => {
             default:
                 return res.status(200).json({ success: true, message: 'Event not handled' });
         }
-    } catch (err) {
-        console.error('Webhook error:', err);
-        return res.status(400).json({ 
+    } catch (error) {
+        console.error("Webhook error:", error);
+        return res.status(400).json({
             success: false, 
-            message: err.message || 'Webhook error' 
+            message: error.message
         });
     }
 }
