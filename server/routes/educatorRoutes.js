@@ -4,7 +4,6 @@ import { requireAuth } from '@clerk/express';
 
 const educatorRouter = express.Router();
 
-educatorRouter.get('/update-role',requireAuth, updateRoleToEducator);
-
+educatorRouter.get('/update-role', requireAuth, updateRoleToEducator);
 
 export default educatorRouter;
