@@ -1,32 +1,48 @@
-import { clerkClient } from "@clerk/express";
+import Course from '../models/Course.js';
+import User from '../models/User.js'; 
+import {v2 as cloudinary} from 'cloudinary'
 
 export const updateRoleToEducator = async (req, res) => {
-    console.log("1. Reached updateRoleToEducator function."); // DEBUG
     try {
-        const { userId } = req.auth; 
-        console.log(`2. Got userId: ${userId}`); // DEBUG
+        const userId = req.user._id; 
 
-        if (!userId) {
-            console.log("3. Unauthorized, no userId found."); // DEBUG
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+        // Find the user by their ID and update their role
+        const user = await User.findByIdAndUpdate(userId, 
+            { role: 'educator' },
+            { new: true } // This option returns the updated user document
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        console.log("4. About to call Clerk to update metadata..."); // DEBUG
-        await clerkClient.users.updateUserMetadata(userId, {
-            publicMetadata: { role: 'educator' }
-        });
-        console.log("5. Successfully updated metadata in Clerk."); // DEBUG
+        res.json({ success: true, message: 'Role updated to educator', role: user.role });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
 
-        res.json({ 
-            success: true, 
-            message: 'You can now publish courses as an educator.'
-        });
+// Add New Course
+export const addCourse = async (req, res) => {
+    try {
+        const {courseData} = req.body
+        const imageFile =  req.imageFile
+        const educatorId = req.auth.userId
+
+        if (!imageFile) {
+            return res.status(404).json({ success: false, message: 'Thumbnail Not Attached' });
+        }
+
+        const parsedCourseData = await json.parse(courseData)
+        parsedCourseData.educator = educatorId
+        const newCourse = await Course.create(parsedCourseData)
+        const imageUpload =  await cloudinary.uploader.upload(imageFile.path)
+        newCourse.courseThumbnail = imageUpload.secure_url
+
+        res.json({ success: true, message: 'Course Added'})
+
 
     } catch (error) {
-        console.error("!!! ERROR in updateRoleToEducator:", error); // DEBUG
-        res.status(500).json({ 
-            success: false, 
-            message: error.message || "An internal server error occurred."
-        });
+        res.json({ success: false, message: error.message})
     }
-};
+}

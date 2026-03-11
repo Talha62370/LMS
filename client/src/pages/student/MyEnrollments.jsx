@@ -25,7 +25,7 @@ const [progressArray, setProgressArray] = useState([
   
 ]);
 
- 
+ console.log("Enrolled Courses Data:", enrolledCourses);
   return (
     <>
     <div className='md:px-36 px-8 pt-10'>

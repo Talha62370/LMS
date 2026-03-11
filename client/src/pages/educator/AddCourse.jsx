@@ -40,7 +40,7 @@ const AddCourse = () => {
         setChapters([...chapters, newChapter]);
       }
     } else if (action === 'remove') {
-      setChapters(chapters.filter((chapter)=> chapter.chapterId != chapterId));
+      setChapters(chapters.filter((chapter)=> chapter.chapterId !== chapterId));
     } else if (action === 'toggle') {
       setChapters(
         chapters.map((chapter) =>

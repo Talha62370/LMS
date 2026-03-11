@@ -1,97 +1,185 @@
 import { createContext, useEffect, useState } from "react";
-import { dummyCourses } from "../assets/assets";
+import { dummyCourses } from "../assets/assets"; 
 import { useNavigate } from "react-router-dom";
 import humanizeDuration from "humanize-duration";
-import {useAuth, useUser} from '@clerk/clerk-react'
+import axios from 'axios'; 
 
 export const AppContext = createContext();
 
+// Get the API URL from the .env file
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export const AppContextprovider = (props) => {
 
-    const currency = import.meta.env.VITE_CURRENCY
-    const navigate = useNavigate()
+    const currency = import.meta.env.VITE_CURRENCY;
+    const navigate = useNavigate();
 
-    const {getToken} = useAuth()
-    const {user} = useUser()
+    // --- NEW AUTH STATE ---
+    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
+    
+    // --- DERIVED STATE ---
+    const isEducator = user?.role === 'educator';
 
+    // --- AXIOS INSTANCE WITH TOKEN ---
+    const api = axios.create({
+        baseURL: API_BASE_URL
+    });
+
+    api.interceptors.request.use((config) => {
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    });
+
+    // --- NEW AUTH FUNCTIONS ---
+    const login = async (email, password) => {
+        try {
+            const res = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+            
+            if (res.data.success) {
+                const { token, ...userData } = res.data;
+                
+                setToken(token);
+                setUser(userData);
+                
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                navigate('/'); 
+            }
+            return res.data; 
+        } catch (error) {
+            console.error("Login failed:", error);
+            return error.response.data; 
+        }
+    };
+
+    // --- UPDATED register FUNCTION ---
+    const register = async (name, email, password, role) => {
+        try {
+            // --- PASS THE 'role' IN THE AXIOS REQUEST ---
+            const res = await axios.post(`${API_BASE_URL}/auth/register`, { name, email, password, role });
+             
+            if (res.data.success) {
+                const { token, ...userData } = res.data;
+
+                setToken(token);
+                setUser(userData);
+
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                navigate('/'); 
+            }
+            return res.data; 
+        } catch (error) {
+            console.error("Registration failed:", error);
+            return error.response.data; 
+        }
+    };
+
+    const logout = () => {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login'); 
+    };
+    
+    const updateUserInContext = (updatedUserData) => {
+        const newUser = { ...user, ...updatedUserData };
+        setUser(newUser);
+        localStorage.setItem('user', JSON.stringify(newUser));
+    };
+
+    const becomeEducator = async () => {
+        try {
+            const res = await api.get('/educator/update-role');
+
+            if (res.data.success) {
+                updateUserInContext({ role: res.data.role });
+                navigate('/educator');
+            } else {
+                console.error("Failed to become educator:", res.data.message);
+            }
+        } catch (error) {
+            console.error("Error updating role:", error);
+        }
+    };
+
+    // --- EXISTING STATE & FUNCTIONS ---
     const [allCourses, setAllCourses] = useState([]);
-    const [isEducator, setIsEducator] = useState(true);
     const [enrolledCourses, setEnrolledCourses] = useState([]);
     
-    // fetch allcourses
-
     const fetchAllCourses = async ()=>{
         setAllCourses(dummyCourses);
     }
 
-    // function to calculate average rating of course
     const calculateRating = (course) => {
-  if (course.courseRatings.length === 0) {
-    return 0;
-  }
-  let totalRating = 0;
-  course.courseRatings.forEach(rating => {
-    totalRating += rating.rating;
-  });
-  return totalRating / course.courseRatings.length;
-};
+        if (course.courseRatings.length === 0) return 0;
+        let totalRating = 0;
+        course.courseRatings.forEach(rating => {
+            totalRating += rating.rating;
+        });
+        return totalRating / course.courseRatings.length;
+    };
 
-// function to calculate Course chapter time
-const calculateChapterTime = (chapter) => {
-  let time = 0
-  chapter.chapterContent.map((lecture) => time += lecture.lectureDuration)
-  return humanizeDuration(time * 60 * 1000, {units: ["h", "m"]})
-}
+    const calculateChapterTime = (chapter) => {
+        let time = 0;
+        chapter.chapterContent.map((lecture) => time += lecture.lectureDuration);
+        return humanizeDuration(time * 60 * 1000, {units: ["h", "m"]});
+    };
 
-// function to calculate course duration
-const calculateCourseDuration = (course) => {
-  let time = 0
-  course.courseContent.map((chapter) => chapter.chapterContent.map(
-    (lecture) => time += lecture.lectureDuration
-  ))
-  return humanizeDuration(time * 60 * 1000, {units: ["h", "m"]})
-}
-// function to calculate to No of Lecture in the course
-const calculateNoOfLecture = (course) => {
-  let totalLecture = 0;
-  course.courseContent.forEach(chapter => {
-    if(Array.isArray(chapter.chapterContent)){
-      totalLecture += chapter.chapterContent.length;
-    }
-  });
-  return totalLecture;
-}
+    const calculateCourseDuration = (course) => {
+        let time = 0;
+        course.courseContent.map((chapter) => chapter.chapterContent.map(
+            (lecture) => time += lecture.lectureDuration
+        ));
+        return humanizeDuration(time * 60 * 1000, {units: ["h", "m"]});
+    };
 
-// fetch user enrolled courses
-const fetchUserEnrolledCourses = async () => {
-  setEnrolledCourses(dummyCourses)
-}
+    const calculateNoOfLecture = (course) => {
+        let totalLecture = 0;
+        course.courseContent.forEach(chapter => {
+            if(Array.isArray(chapter.chapterContent)){
+            totalLecture += chapter.chapterContent.length;
+            }
+        });
+        return totalLecture;
+    };
+
+    const fetchUserEnrolledCourses = async () => {
+        setEnrolledCourses(dummyCourses);
+    };
 
     useEffect(() => {
-        fetchAllCourses()
-        fetchUserEnrolledCourses()
-    },[]);
+        fetchAllCourses();
+        if (token) {
+            fetchUserEnrolledCourses();
+        }
+    }, [token]); 
 
-    const logToken = async ()=> {
-      console.log(await getToken());
-      
-    }
-
-    useEffect(()=> {
-      if(user){
-          logToken()
-      }
-    },[user])
-
+    // --- NEW VALUE OBJECT ---
     const value = {
-      currency, allCourses, navigate, calculateRating, isEducator, setIsEducator,
-      calculateChapterTime, calculateCourseDuration,calculateNoOfLecture,enrolledCourses, fetchUserEnrolledCourses,
-    }
-
+        currency, allCourses, navigate, calculateRating, isEducator,
+        calculateChapterTime, calculateCourseDuration, calculateNoOfLecture,
+        enrolledCourses, fetchUserEnrolledCourses,
+        
+        login,
+        logout,
+        register,
+        user,       
+        token,      
+        api,        
+        updateUserInContext,
+        becomeEducator 
+    };
 
     return (
         <AppContext.Provider value={value}>
-        {props.children}
+            {props.children}
         </AppContext.Provider>
     )
 }
